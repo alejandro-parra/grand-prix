@@ -1,85 +1,45 @@
 package main
 
-import (
-	"image/png"
-	"io"
-	"os"
-	"os/exec"
-	"runtime"
-)
+import "time"
 
 var grid [][]string
-var clear map[string]func() //create a map for storing clear funcs
 
-func init() {
-	clear = make(map[string]func()) //Initialize it
-	clear["linux"] = func() {
-		cmd := exec.Command("clear") //Linux example, its tested
-		cmd.Stdout = os.Stdout
-		cmd.Run()
-	}
-	clear["windows"] = func() {
-		cmd := exec.Command("cmd", "/c", "cls") //Windows example, its tested
-		cmd.Stdout = os.Stdout
-		cmd.Run()
-	}
+type Location struct {
+	Carril int
+	Pos    int
+}
+type Car struct {
+	responseChan chan bool
+	id           int
 }
 
 func main() {
-
+	lugaresDeInicio := [16]int{1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4}
+	numCarros := 4
+	numVueltas := 3
+	updateCh := make(chan Location)
 	//initialize the grid which will be the playable space
-	grid = make([][]string, 50)
+	listChans = make(map[chan Location]Car)
+	//definir rango de randoms de aceleracion y max speed
+
+	for i := 1; i < numCarros+1; i++ {
+		tmpResponseChan := make(chan bool)
+		tmpRequestChan := make(chan Location)
+		listChans[tmpRequestChan] = Car{tmpResponseChan, i}
+		go carro(i, Location{i, lugaresDeInicio[i]}, 0.1)
+	}
+
+	grid = make([][]string, 8)
 	for i := range grid {
 		grid[i] = make([]string, 100)
 	}
-	//load the image of the course and read the pixels to make the grid
-	gridImageFile, err := os.Open("grid.png")
-	if err != nil {
-		println("error reading image")
-		os.Exit(1)
-	}
-
-	setupGrid(gridImageFile)
-	grid[20][25] = "O"
-	printGrid()
-	for i := 20; i < 35; i++ {
-		grid[i][25] = " "
-		grid[i+1][25] = "O"
-		CallClear()
-		printGrid()
-	}
-	/*for i := range grid {
+	for i := range grid {
 		for j := range grid[i] {
-			grid[i][j] = false
-			print(grid[i][j])
-		}
-		println("")
-	}*/
-
-}
-
-// Get the bi-dimensional pixel array
-func setupGrid(gridImageFile io.Reader) {
-	gridImage, err := png.Decode(gridImageFile)
-	if err != nil {
-		println("error decoding image")
-		os.Exit(2)
-	}
-
-	bounds := gridImage.Bounds()
-	width, height := bounds.Max.X, bounds.Max.Y
-
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			_, _, _, a := gridImage.At(x, y).RGBA()
-			if a == 65535 {
-				grid[y][x] = "x"
-			} else {
-				grid[y][x] = " "
-			}
-
+			grid[i][j] = " "
 		}
 	}
+	printGrid()
+
 }
 
 func printGrid() {
@@ -88,14 +48,43 @@ func printGrid() {
 			print(grid[i][j])
 		}
 		println("")
+		println("-------------------------------------------------------------------------------------------------------------------------------------------------------------")
 	}
 }
+func carro(id int, initLocation Location, maxSpeed float32, acceleration float32, chanRequest chan Location, response chan bool) {
+	//sleep
+	start = time.Now()
+	lap := 0
+	currentLocation := initLocation
+	currentVelocity := 0
+	currentAcceleration := acceleration
+	currentVelocity += acceleration
+	desacceleration := 0
+	sleep := time.Millisecond * 1000
+	for {
+		if velocity < maxSpeed {
+			time.Sleep(sleep - velocity)
+		} else {
+			time.Sleep(sleep - maxSpeed)
+		}
 
-func CallClear() {
-	value, ok := clear[runtime.GOOS] //runtime.GOOS -> linux, windows, darwin etc.
-	if ok {                          //if we defined a clear func for that platform:
-		value() //we execute it
-	} else { //unsupported platform
-		panic("Your platform is unsupported! I can't clear terminal screen :(")
+		//el carro se duerme
+
+		/*el carro analiza el grid
+
+		- si en los proximos 10mts hay un obstaculo:
+			- si es un corredor, moverse a un lado
+			- si es pared o si no se puede mover al lado, empezar a desacelerar
+
+			- definir nextLocation
+			- definir nextAcc, el valor que se actualizara al final
+
+		el carro le pide al main que lo mueva
+			- el main regresa su decision
+			- si el main dijo que si, actualiza valores de acceleration, velocity, y pocision
+
+		si no, recalcula y vuelve a solicitar movimiento
+		*/
+		velocity += acceleration
 	}
 }

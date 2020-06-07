@@ -13,6 +13,7 @@ var (
 	track       [][]string
 	competitors = make(map[int]chan bool)
 	requests    = make(chan Location)
+	updateChan = make(chan Update,30)//no pasa naaa
 	totalLaps   int
 )
 
@@ -22,6 +23,9 @@ type Update struct {
 	rail     int
 	position int
 	lap      int
+	speed	 float64
+	lapTime  string
+	racingTime	string
 }
 
 //Location : struct that contains essential elements for the broadcasters
@@ -66,12 +70,15 @@ func main() {
 		go racerDynamics(Location{i, i, initialPositions[i], 1}, tmpMaxSpeed, tmpAcceleration, requests, tmpResponseChan)
 	}
 
+	start := time.Now()
+
 	for {
 		recievedRequest := <-requests
 		if track[recievedRequest.rail][recievedRequest.position] == " " {
 			track[recievedRequest.rail][recievedRequest.position] = strconv.Itoa(recievedRequest.id)
-			competitors[recievedRequest.id] <- true
-			if recievedRequest.currentLap == totalLaps && recievedRequest.position == 0 {
+			competitors[recievedRequest.id] <- true	//change accepted
+			//update track
+			if recievedRequest.currentLap == totalLaps && recievedRequest.position == 0 {//declare winners
 				winners = append(winners, recievedRequest.id)
 				if len(winners) == 3 {
 					break
@@ -97,25 +104,10 @@ func printTrack() {
 func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64, chanRequest chan Location, response chan bool) {
 	// zonas de frenado {40, 80, 120, 160}
 
-	/*el carro analiza el grid
-
-	- si en los proximos 10mts hay un obstaculo:
-		- si es un corredor, moverse a un lado
-		- si es pared o si no se puede mover al lado, empezar a desacelerar
-
-		- definir nextLocation
-		- definir nextAcc, el valor que se actualizara al final
-
-	el carro le pide al main que lo mueva
-		- el main regresa su decision
-		- si el main dijo que si, actualiza valores de acceleration, velocity, y pocision
-
-	si no, recalcula y vuelve a solicitar movimiento
-	*/
-
 	start := time.Now() //tiempo al inicio de la carrera
+	startLap := time.Now()
+	elapsed:=time.Now()
 	id := initLocation.id
-	lap := initLocation.currentLap
 	currentLocation := initLocation
 	currentVelocity := 0.0
 	currentVelocity += acceleration
@@ -177,7 +169,7 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 				nextAcceleration = acceleration
 			}
 			//si el carro se encuentra en una zona de frenado (curvas)
-			if currentLocation.position >= 40 || currentLocation.position <= 50 || currentLocation.position >= 80 || currentLocation.position <= 90 || currentLocation.position >= 120 || currentLocation.position <= 130 || currentLocation.position >= 160 || currentLocation.position <= 170 {
+			if (currentLocation.position >= 40 && currentLocation.position <= 50) || (currentLocation.position >= 80 && currentLocation.position <= 90) || (currentLocation.position >= 120 && currentLocation.position <= 130) || (currentLocation.position >= 160 && currentLocation.position <= 170) {
 				nextAcceleration = desaccelerationCurve
 			}
 			chanRequest <- nextLocation
@@ -186,9 +178,9 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 				break
 			}
 		}
-		if nextLocation.position == 100 {
-			t := time.Now()
-			elapsed := t.Sub(start)
+		if nextLocation.position == 200 {
+			elapsed = time.Now().Sub(startLap)
+			startLap=time.Now()
 			nextLocation.position = 0
 			lap++
 		}
@@ -200,5 +192,22 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 		} else {
 			currentVelocity += nextAcceleration
 		}
+		updateChan <- Update{id,currentLocation.rail,currentLocation.position,lap,currentVelocity,elapsed.String(),time.Now().Sub(start).String()}
+	}
+}
+
+/*type Update struct {
+	id       int
+	rail     int
+	position int
+	lap      int
+	speed	 float64
+	lapTime  string
+	racingTime	string
+}*/ 
+func prints(){
+	for{
+		fmt.Println(<- updateChan)
+		time.Sleep(1000 *time.Millisecond)
 	}
 }

@@ -46,9 +46,8 @@ func setupGrid(gridImageFile io.Reader) {
 
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
-			r, g, b, a := gridImage.At(x, y).RGBA()
-			_ = a
-			if r == 0 && g == 0 && b == 0 {
+			_, _, _, a := gridImage.At(x, y).RGBA()
+			if a == 65535 {
 				grid[y][x] = true
 				print("X")
 			} else {

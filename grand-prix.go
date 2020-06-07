@@ -1,74 +1,115 @@
 package main
 
-import "time"
+import (
+	"time"
+	"math/rand"
+	"os"
+	"strconv"
+)
 
-var grid [][]string
+type racer chan <-Location
+
+var (
+	track [][]string
+	competitors = make(map[int]chan bool)
+	requests =  make(chan Location)
+	totalLaps int
+)
+
 
 type Location struct {
-	Carril int
-	Pos    int
-}
-type Car struct {
-	responseChan chan bool
-	id           int
+	id int
+	rail int
+	position int
+	currentLap int
 }
 
 func main() {
-	lugaresDeInicio := [16]int{1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4}
-	numCarros := 4
-	numVueltas := 3
-	updateCh := make(chan Location)
-	//initialize the grid which will be the playable space
-	listChans = make(map[chan Location]Car)
-	//definir rango de randoms de aceleracion y max speed
+	var winners []int
+	track = make([][]string, 8)
 
-	for i := 1; i < numCarros+1; i++ {
-		tmpResponseChan := make(chan bool)
-		tmpRequestChan := make(chan Location)
-		listChans[tmpRequestChan] = Car{tmpResponseChan, i}
-		go carro(i, Location{i, lugaresDeInicio[i]}, 0.1)
+	for i := range track {
+		track[i] = make([]string, 200)
 	}
 
-	grid = make([][]string, 8)
-	for i := range grid {
-		grid[i] = make([]string, 100)
-	}
-	for i := range grid {
-		for j := range grid[i] {
-			grid[i][j] = " "
+	for i := range track {
+		for j := range track[i] {
+			track[i][j] = " "
 		}
 	}
-	printGrid()
 
+	args := os.Args[1:]
+	numOfRacers := 4
+	totalLaps = 3
+	initialPositions := [16]int{1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4}
+
+	// go run gran-prix.go -racers 16 - laps 20
+	if len(args) == 4 {
+		numOfRacers = args[1]
+		totalLaps = args[3]
+	}
+
+	for i := 1; i < racers + 1; i++ {
+		tmpResponseChan := make(chan bool) 
+		competitors[i] = tmpResponseChan
+		tmpMaxSpeed := rand.Intn(900 - 400) + 400
+		tmpAcceleration := rand.Intn(100 - 40) + 40
+		go racerDynamics(i, Location{i, i, initialPositions[i], 1}, tmpMaxSpeed, tmpAcceleration, requests, tmpResponseChan)
+	}
+
+	for {
+		recievedRequest := <- requests
+		if track[recievedRequest.rail][recievedRequest.position] == " "{
+			track[recievedRequest.rail][recievedRequest.position] = strconv.Itoa(recievedRequest.id)
+			competitors[recievedRequest.id] <- true
+			if recievedRequest.currentLap == totalLaps && recievedRequest.position == 0{
+				append(winners, recievedRequest.id)
+				if len(winners) == 3{
+					break
+				}
+			}
+		}
+		else{
+			competitors[recievedRequest.id] <- false
+		}
+	}
 }
 
-func printGrid() {
-	for i := range grid {
-		for j := range grid[i] {
-			print(grid[i][j])
+func printTrack() {
+	for i := range track {
+		for j := range track[i] {
+			print(track[i][j])
 		}
 		println("")
 		println("-------------------------------------------------------------------------------------------------------------------------------------------------------------")
 	}
 }
-func carro(id int, initLocation Location, maxSpeed float32, acceleration float32, chanRequest chan Location, response chan bool) {
-	//sleep
+func racerDynamics(initLocation Location, maxSpeed float32, acceleration float32, chanRequest chan Location, response chan bool) {
 	start = time.Now()
-	lap := 0
+	id := initLocation.id
+	
+
 	currentLocation := initLocation
 	currentVelocity := 0
 	currentAcceleration := acceleration
 	currentVelocity += acceleration
-	desacceleration := 0
-	sleep := time.Millisecond * 1000
-	for {
-		if velocity < maxSpeed {
-			time.Sleep(sleep - velocity)
+	desaccelerationRacer := - 400
+	desaccelerationCurve := - 100
+	
+	sleep := 1000
+	for lap := initLocation.currentLap; lap < totalLaps;{
+		if currentVelocity < maxSpeed {
+			time.Sleep((sleep - currentVelocity) * time.Millisecond)
 		} else {
-			time.Sleep(sleep - maxSpeed)
+			time.Sleep((sleep - maxSpeed) * time.Millisecond)
 		}
 
-		//el carro se duerme
+		for i := currentLocation.position + 1; i < currentLocation.position + 10; i++{
+			if track[currentLocation.rail][i] != " "{
+				
+			}
+		}
+		// zonas de frenado {40, 80, 120, 160}
 
 		/*el carro analiza el grid
 
@@ -85,6 +126,6 @@ func carro(id int, initLocation Location, maxSpeed float32, acceleration float32
 
 		si no, recalcula y vuelve a solicitar movimiento
 		*/
-		velocity += acceleration
+		currentVelocity += acceleration
 	}
 }

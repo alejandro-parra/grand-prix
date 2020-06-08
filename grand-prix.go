@@ -15,10 +15,10 @@ type racer chan<- Location
 
 var (
 	track         [][]string
-	competitors   = make(map[int]chan bool)
-	requests      = make(chan Location)
+	competitors   = make(map[int]chan bool) //the reference to each communication with the racers
+	requests      = make(chan Location)     //a channel that all racers use to ask main to move
 	destroy       = make(chan Location, 60)
-	updateChan    = make(chan Update, 60) //no pasa naaa
+	updateChan    = make(chan Update, 60) //channel to provide the printing system each racer's stats
 	totalLaps     int
 	numOfRacers   int
 	totalDistance int
@@ -46,6 +46,7 @@ type Location struct {
 	currentLap int
 }
 
+//code from: https://stackoverflow.com/questions/22891644/how-can-i-clear-the-terminal-screen-in-go
 func init() {
 	clear = make(map[string]func()) //Initialize it
 	clear["linux"] = func() {
@@ -59,7 +60,6 @@ func init() {
 		cmd.Run()
 	}
 }
-
 func callClear() {
 	value, ok := clear[runtime.GOOS] //runtime.GOOS -> linux, windows, darwin etc.
 	if ok {                          //if we defined a clear func for that platform:
@@ -75,27 +75,43 @@ func main() {
 	winners = winners[:0]
 	track = make([][]string, 8)
 
+	//initialize empty track array
 	for i := range track {
 		track[i] = make([]string, totalDistance)
 	}
-
 	for i := range track {
 		for j := range track[i] {
 			track[i][j] = " "
 		}
 	}
 
-	args := os.Args[1:]
+	//args := os.Args[1:]
 	numOfRacers = 4
 	totalLaps = 3
+
+	//array used to specify starting positions of racers at start of race
 	initialPositions := [16]int{0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3}
 
-	// go run gran-prix.go -racers 16 -laps 20
-	if len(args) == 4 {
-		numOfRacers, _ = strconv.Atoi(os.Args[2])
-		totalLaps, _ = strconv.Atoi(os.Args[4])
+	// usage: go run gran-prix.go -racers 16 -laps 20
+	if len(os.Args) == 5 || len(os.Args) == 1 {
+		if len(os.Args) == 1 {
+		} else if os.Args[1] == "-racers" && os.Args[3] == "-laps" {
+			numOfRacers, _ = strconv.Atoi(os.Args[2])
+			totalLaps, _ = strconv.Atoi(os.Args[4])
+		} else {
+			println("Wrong parameters. Usage: go run grand-prix.go -racers X -laps X")
+			os.Exit(1)
+		}
+
+	} else {
+		println("Wrong parameters. Usage: go run grand-prix.go -racers X -laps X")
+		os.Exit(2)
 	}
+
+	//create random generator for velocity and acceleration of cars
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	//initialize racers
 	for i := 1; i < numOfRacers+1; i++ {
 		tmpResponseChan := make(chan bool)
 		competitors[i] = tmpResponseChan
@@ -104,9 +120,14 @@ func main() {
 		go racerDynamics(Location{i, i % 8, initialPositions[i], 1}, tmpMaxSpeed, tmpAcceleration, requests, tmpResponseChan)
 	}
 
+	//run the stat printing mechanism
 	go prints()
+
+	//loop for recieving requests from racers (Broadcaster)
 	for {
 		select {
+
+		//a car sends a request to move to a certain location
 		case recievedRequest := <-requests:
 			if track[recievedRequest.rail][recievedRequest.position] == " " {
 				track[recievedRequest.rail][recievedRequest.position] = strconv.Itoa(recievedRequest.id)
@@ -125,11 +146,12 @@ func main() {
 			} else {
 				competitors[recievedRequest.id] <- false
 			}
+		//a call to destroy an object from the track
 		case recievedRequest := <-destroy:
 			if track[recievedRequest.rail][recievedRequest.position] == strconv.Itoa(recievedRequest.id) {
 				track[recievedRequest.rail][recievedRequest.position] = " "
 			} else {
-				fmt.Println("UYYYYYYYYYYYYY", track[recievedRequest.rail][recievedRequest.position])
+				fmt.Println("Error, destroy request", track[recievedRequest.rail][recievedRequest.position])
 			}
 		}
 
@@ -137,13 +159,16 @@ func main() {
 
 }
 
+//function to print the track at any moment in race
 func printTrack() {
 	for i := range track {
+		print("|")
 		for j := range track[i] {
 			print(track[i][j])
 		}
+		print("|")
 		println("")
-		println("-------------------------------------------------------------------------------------------------------------------------------------------------------------")
+		println("|----------------------------------------------------------------------------------------------------|")
 	}
 }
 func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64, chanRequest chan Location, response chan bool) {
@@ -525,7 +550,7 @@ func prints() {
 			println("------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
 
 		}
-
+		printTrack()
 	}
 
 }

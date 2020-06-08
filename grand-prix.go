@@ -21,7 +21,7 @@ var (
 	updateChan  = make(chan Update, 60) //no pasa naaa
 	totalLaps   int
 	numOfRacers int
-	winners     = make([]int, 3)
+	winners     = [3]int{0, 0, 0}
 	clear       map[string]func() //create a map for storing clear funcs
 )
 
@@ -72,6 +72,7 @@ func callClear() {
 }
 
 func main() {
+	//winners = winners[:0]
 	track = make([][]string, 8)
 	competitors := make(map[int]chan bool)
 	initialPositions := [16]int{0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3}
@@ -107,6 +108,7 @@ func main() {
 
 	//start := time.Now()
 	go prints()
+	c := 0
 	for {
 		select {
 		case recievedRequest := <-requests:
@@ -117,8 +119,9 @@ func main() {
 				//update track
 				if recievedRequest.currentLap == totalLaps && recievedRequest.position == 0 { //declare winners
 					fmt.Println("WINNER WINNER CHICKEN DINNER", recievedRequest.id)
-					winners = append(winners, recievedRequest.id)
-					if len(winners) == 3 {
+					winners[c] = recievedRequest.id
+					c++
+					if winners[2] != 0 {
 						println("race is over")
 						fmt.Println("THE WINNERS ARE:", winners)
 						return
@@ -278,7 +281,8 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 }*/
 func prints() {
 	updateList := make([]Update, numOfRacers)
-
+	funNames := [17]string{"?", "Mario", "Luigi", "Peach", "D.K", "Bowser", "Toad", "Rosalina", "Shyguy", "Boo", "Daisy",
+		"Raio Mqueen", "Toreto", "El rey", "El oliver", "El tachas", "dicesiseis"}
 	info := [7]string{"Player ", "Rail: ", "Position: ", "Lap: ", "Speed: ", "Lap Time: ", "GlobalTime: "}
 	for {
 		time.Sleep(500 * time.Millisecond)
@@ -297,9 +301,9 @@ func prints() {
 		}
 
 		tmpString := ""
-		//callClear()
+		callClear()
 		for j := 0; j < numOfRacers; j++ {
-			tmptmpstring := info[0] + strconv.Itoa(updateList[j].id)
+			tmptmpstring := info[0] + funNames[updateList[j].id]
 			if len(tmptmpstring) < 15 {
 				tmptmpstring += strings.Repeat(" ", (15 - len(tmptmpstring)))
 			}

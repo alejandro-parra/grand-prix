@@ -101,10 +101,10 @@ func main() {
 		competitors[i] = tmpResponseChan
 		tmpMaxSpeed := float64(r.Intn(900-400) + 400)
 		tmpAcceleration := float64(r.Intn(100-40) + 40)
-		go racerDynamics(Location{i, i % 8, initialPositions[i], 1}, tmpMaxSpeed, tmpAcceleration, requests, tmpResponseChan)
+		go racerDynamics(Location{i, i % 8, initialPositions[i-1], 1}, tmpMaxSpeed, tmpAcceleration, requests, tmpResponseChan)
 	}
-
-	go prints()
+	killPrint := make(chan struct{})
+	go prints(killPrint)
 	for {
 		select {
 		case recievedRequest := <-requests:
@@ -117,6 +117,7 @@ func main() {
 					fmt.Println("WINNER WINNER CHICKEN DINNER", recievedRequest.id)
 					winners = append(winners, recievedRequest.id)
 					if len(winners) == 3 {
+						killPrint <- struct{}{}
 						println("race is over")
 						fmt.Println("THE WINNERS ARE:", winners)
 						return
@@ -285,20 +286,27 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 	lapTime  string
 	racingTime	string
 }*/
-func prints() {
+func prints(killT chan struct{}) {
 	start := time.Now()
 	updateList := make([]Update, numOfRacers)
 	numSpaces := 25
 	info := [8]string{"Player ", "Rail: ", "Position: ", "Lap: ", "Speed: ", "Lap Time: ", "GlobalTime: ", "LastUpdate: "}
 	for {
 		time.Sleep(500 * time.Millisecond)
-		tmpUpdateList := make([]Update, 20)
+		space := 20
 		if len(winners) >= 1 {
-			tmpUpdateList = make([]Update, 5)
+			space = 5
+		} else if numOfRacers < 5 {
+			space = 10
 		}
-
+		tmpUpdateList := make([]Update, space)
 		for i := 0; i < len(tmpUpdateList); i++ {
-			tmpUpdateList[i] = <-updateChan
+			select {
+			case x := <-updateChan:
+				tmpUpdateList[i] = x
+			case <-killT:
+				return
+			}
 		}
 
 		for i := 0; i < len(tmpUpdateList); i++ {
@@ -306,7 +314,7 @@ func prints() {
 			updateList[tmpid-1] = tmpUpdateList[i]
 		}
 		tmpString := ""
-		//callClear()
+		callClear()
 
 		if numOfRacers < 9 {
 			for j := 0; j < numOfRacers; j++ {

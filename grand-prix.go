@@ -1,31 +1,39 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
+	"os/exec"
+	"runtime"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type racer chan<- Location
 
 var (
-	track       [][]string
-	competitors = make(map[int]chan bool)
-	requests    = make(chan Location)
-	updateChan = make(chan Update,30)//no pasa naaa
-	totalLaps   int
+	track         [][]string
+	competitors   = make(map[int]chan bool)
+	requests      = make(chan Location)
+	updateChan    = make(chan Update, 60) //no pasa naaa
+	totalLaps     int
+	numOfRacers   int
+	totalDistance int
+	winners       []int
+	clear         map[string]func() //create a map for storing clear funcs
 )
 
 //Update : struct that contains essential elements for the broadcasters
 type Update struct {
-	id       int
-	rail     int
-	position int
-	lap      int
-	speed	 float64
-	lapTime  string
-	racingTime	string
+	id         int
+	rail       int
+	position   int
+	lap        int
+	speed      float64
+	lapTime    string
+	racingTime string
 }
 
 //Location : struct that contains essential elements for the broadcasters
@@ -36,13 +44,37 @@ type Location struct {
 	currentLap int
 }
 
+func init() {
+	clear = make(map[string]func()) //Initialize it
+	clear["linux"] = func() {
+		cmd := exec.Command("clear") //Linux example, its tested
+		cmd.Stdout = os.Stdout
+		cmd.Run()
+	}
+	clear["windows"] = func() {
+		cmd := exec.Command("cmd", "/c", "cls") //Windows example, its tested
+		cmd.Stdout = os.Stdout
+		cmd.Run()
+	}
+}
+
+func callClear() {
+	value, ok := clear[runtime.GOOS] //runtime.GOOS -> linux, windows, darwin etc.
+	if ok {                          //if we defined a clear func for that platform:
+		value() //we execute it
+	} else { //unsupported platform
+		panic("Your platform is unsupported! I can't clear terminal screen :(")
+	}
+}
+
 func main() {
-	winners := []int{1, 2, 3}
+	totalDistance = 100
+	winners = []int{1, 2, 3}
 	winners = winners[:0]
 	track = make([][]string, 8)
 
 	for i := range track {
-		track[i] = make([]string, 200)
+		track[i] = make([]string, totalDistance)
 	}
 
 	for i := range track {
@@ -52,7 +84,7 @@ func main() {
 	}
 
 	args := os.Args[1:]
-	numOfRacers := 4
+	numOfRacers = 4
 	totalLaps = 3
 	initialPositions := [16]int{0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3}
 
@@ -70,20 +102,18 @@ func main() {
 		go racerDynamics(Location{i, i, initialPositions[i], 1}, tmpMaxSpeed, tmpAcceleration, requests, tmpResponseChan)
 	}
 
-	start := time.Now()
-
+	//start := time.Now()
+	go prints()
 	for {
 		recievedRequest := <-requests
 		if track[recievedRequest.rail][recievedRequest.position] == " " {
 			track[recievedRequest.rail][recievedRequest.position] = strconv.Itoa(recievedRequest.id)
-			competitors[recievedRequest.id] <- true	//change accepted
+			competitors[recievedRequest.id] <- true //change accepted
 			//update track
-			if recievedRequest.currentLap == totalLaps && recievedRequest.position == 0 {//declare winners
+			if recievedRequest.currentLap == totalLaps && recievedRequest.position == 0 { //declare winners
 				winners = append(winners, recievedRequest.id)
 				if len(winners) == 3 {
 					break
-					println(winners)
-
 				}
 			}
 		} else {
@@ -106,7 +136,7 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 
 	start := time.Now() //tiempo al inicio de la carrera
 	startLap := time.Now()
-	elapsed:=time.Now()
+	elapsed := startLap.Sub(start)
 	id := initLocation.id
 	currentLocation := initLocation
 	currentVelocity := 0.0
@@ -118,7 +148,7 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 	nextLocation := Location{0, 0, 0, 0}
 	nextAcceleration := 0.0
 	lap := initLocation.currentLap
-	for lap < totalLaps { //mientras el coche no haya terminado la carrera
+	for lap < totalLaps+1 { //mientras el coche no haya terminado la carrera
 		if currentVelocity < maxSpeed { //si el carro no ha llegado a su limite de velocidad
 			time.Sleep(time.Duration(sleep-currentVelocity) * time.Millisecond)
 		} else { //si el carro ya llego a su limite de velocidad
@@ -126,8 +156,13 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 		}
 		for {
 			firstThreat := false
+			indexOutOfRange := false
 			//se checan las siguientes 5 posiciones en busqueda de carros que estorben
 			for i := currentLocation.position + 1; i < currentLocation.position+5; i++ {
+				if i == totalDistance {
+					indexOutOfRange = true
+					i = 0
+				}
 				if track[currentLocation.rail][i] != " " { //si en esta posición hay un carro
 					firstThreat = true
 					//ver si se puede mover a los lados y rebasar el otro carro
@@ -149,7 +184,7 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 						}
 					} else {
 						if track[currentLocation.rail+1][currentLocation.position] == " " {
-							nextLocation := Location{id, currentLocation.rail + 1, currentLocation.position, lap}
+							nextLocation = Location{id, currentLocation.rail + 1, currentLocation.position, lap}
 							nextAcceleration = acceleration
 						} else if track[currentLocation.rail-1][currentLocation.position] == " " {
 							nextLocation = Location{id, currentLocation.rail - 1, currentLocation.position, lap}
@@ -160,7 +195,7 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 						}
 					}
 				}
-				if firstThreat {
+				if firstThreat || indexOutOfRange {
 					break
 				}
 			}
@@ -172,16 +207,19 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 			if (currentLocation.position >= 40 && currentLocation.position <= 50) || (currentLocation.position >= 80 && currentLocation.position <= 90) || (currentLocation.position >= 120 && currentLocation.position <= 130) || (currentLocation.position >= 160 && currentLocation.position <= 170) {
 				nextAcceleration = desaccelerationCurve
 			}
+			if nextLocation.position >= totalDistance {
+				nextLocation.position = 0
+			}
 			chanRequest <- nextLocation
 
 			if <-response == true {
 				break
 			}
 		}
-		if nextLocation.position == 200 {
-			elapsed = time.Now().Sub(startLap)
-			startLap=time.Now()
-			nextLocation.position = 0
+		if nextLocation.position == 0 {
+			t := time.Now()
+			elapsed = t.Sub(startLap)
+			startLap = time.Now()
 			lap++
 		}
 		currentLocation = nextLocation
@@ -190,9 +228,16 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 				currentVelocity += nextAcceleration
 			}
 		} else {
-			currentVelocity += nextAcceleration
+			if currentVelocity >= 0 {
+				if currentVelocity-nextAcceleration < 0 {
+					currentVelocity = 0
+				} else {
+					currentVelocity += nextAcceleration
+				}
+
+			}
 		}
-		updateChan <- Update{id,currentLocation.rail,currentLocation.position,lap,currentVelocity,elapsed.String(),time.Now().Sub(start).String()}
+		updateChan <- Update{id, currentLocation.rail, currentLocation.position, lap, currentVelocity, elapsed.String(), time.Now().Sub(start).String()}
 	}
 }
 
@@ -204,10 +249,92 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 	speed	 float64
 	lapTime  string
 	racingTime	string
-}*/ 
-func prints(){
-	for{
-		fmt.Println(<- updateChan)
-		time.Sleep(1000 *time.Millisecond)
+}*/
+func prints() {
+	updateList := make([]Update, numOfRacers)
+
+	info := [7]string{"Player ", "Rail: ", "Position: ", "Lap: ", "Speed: ", "Lap Time: ", "GlobalTime: "}
+	for {
+		callClear()
+		time.Sleep(500 * time.Millisecond)
+		tmpUpdateList := make([]Update, 20)
+		if len(winners) >= 1 {
+			tmpUpdateList = make([]Update, 5)
+		}
+
+		for i := 0; i < len(tmpUpdateList); i++ {
+			tmpUpdateList[i] = <-updateChan
+		}
+
+		for i := 0; i < len(tmpUpdateList); i++ {
+			tmpid := tmpUpdateList[i].id
+			updateList[tmpid-1] = tmpUpdateList[i]
+		}
+
+		tmpString := ""
+		for j := 0; j < numOfRacers; j++ {
+			tmptmpstring := info[0] + strconv.Itoa(updateList[j].id)
+			if len(tmptmpstring) < 15 {
+				tmptmpstring += strings.Repeat(" ", (15 - len(tmptmpstring)))
+			}
+			tmpString += tmptmpstring
+		}
+		println(tmpString)
+		tmpString = ""
+		for j := 0; j < numOfRacers; j++ {
+			tmptmpstring := info[1] + strconv.Itoa(updateList[j].rail)
+			if len(tmptmpstring) < 15 {
+				tmptmpstring += strings.Repeat(" ", (15 - len(tmptmpstring)))
+			}
+			tmpString += tmptmpstring
+		}
+		println(tmpString)
+		tmpString = ""
+		for j := 0; j < numOfRacers; j++ {
+			tmptmpstring := info[2] + strconv.Itoa(updateList[j].position)
+			if len(tmptmpstring) < 15 {
+				tmptmpstring += strings.Repeat(" ", (15 - len(tmptmpstring)))
+			}
+			tmpString += tmptmpstring
+		}
+		println(tmpString)
+		tmpString = ""
+		for j := 0; j < numOfRacers; j++ {
+			tmptmpstring := info[3] + strconv.Itoa(updateList[j].lap)
+			if len(tmptmpstring) < 15 {
+				tmptmpstring += strings.Repeat(" ", (15 - len(tmptmpstring)))
+			}
+			tmpString += tmptmpstring
+		}
+		println(tmpString)
+		tmpString = ""
+		for j := 0; j < numOfRacers; j++ {
+			s := fmt.Sprintf("%f", updateList[j].speed)
+			tmptmpstring := info[4] + s
+			if len(tmptmpstring) < 15 {
+				tmptmpstring += strings.Repeat(" ", (15 - len(tmptmpstring)))
+			}
+			tmpString += tmptmpstring
+		}
+		println(tmpString)
+		tmpString = ""
+		for j := 0; j < numOfRacers; j++ {
+			tmptmpstring := info[5] + updateList[j].lapTime
+			if len(tmptmpstring) < 15 {
+				tmptmpstring += strings.Repeat(" ", (15 - len(tmptmpstring)))
+			}
+			tmpString += tmptmpstring
+		}
+		println(tmpString)
+		tmpString = ""
+		for j := 0; j < numOfRacers; j++ {
+			tmptmpstring := info[6] + updateList[j].racingTime
+			if len(tmptmpstring) < 15 {
+				tmptmpstring += strings.Repeat(" ", (15 - len(tmptmpstring)))
+			}
+			tmpString += tmptmpstring
+		}
+		println(tmpString)
 	}
+
 }

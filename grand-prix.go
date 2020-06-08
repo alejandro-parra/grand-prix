@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
 	"os"
@@ -14,16 +15,18 @@ import (
 type racer chan<- Location
 
 var (
-	track         [][]string
-	competitors   = make(map[int]chan bool)
-	requests      = make(chan Location)
-	destroy       = make(chan Location, 60)
-	updateChan    = make(chan Update, 60) //no pasa naaa
-	totalLaps     int
-	numOfRacers   int
-	totalDistance int
-	winners       []int
-	clear         map[string]func() //create a map for storing clear funcs
+	track       [][]string
+	requests    = make(chan Location)
+	destroy     = make(chan Location, 60)
+	updateChan  = make(chan Update, 60) //no pasa naaa
+	totalLaps   int
+	numOfRacers int
+	winners     = make([]int, 3)
+	clear       map[string]func() //create a map for storing clear funcs
+)
+
+const (
+	totalDistance = 100
 )
 
 //Update : struct that contains essential elements for the broadcasters
@@ -69,10 +72,14 @@ func callClear() {
 }
 
 func main() {
-	totalDistance = 100
-	winners = []int{1, 2, 3}
-	winners = winners[:0]
 	track = make([][]string, 8)
+	competitors := make(map[int]chan bool)
+	initialPositions := [16]int{0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3}
+	nr := flag.Int("racers", 4, "number of racers!")
+	nl := flag.Int("laps", 3, "number of laps!")
+	flag.Parse()
+	numOfRacers = *nr
+	totalLaps = *nl
 
 	for i := range track {
 		track[i] = make([]string, totalDistance)
@@ -84,16 +91,11 @@ func main() {
 		}
 	}
 
-	args := os.Args[1:]
-	numOfRacers = 4
-	totalLaps = 3
-	initialPositions := [16]int{0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3}
-
 	// go run gran-prix.go -racers 16 - laps 20
-	if len(args) == 4 {
+	/*if len(args) == 4 {
 		numOfRacers, _ = strconv.Atoi(os.Args[1])
 		totalLaps, _ = strconv.Atoi(os.Args[3])
-	}
+	}*/
 
 	for i := 1; i < numOfRacers+1; i++ {
 		tmpResponseChan := make(chan bool)

@@ -214,35 +214,35 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 						if track[currentLocation.rail+1][(currentLocation.position+1)%totalDistance] == " " {
 							nextLocation = Location{id, currentLocation.rail + 1, currentLocation.position + 1, lap}
 							nextAcceleration = acceleration
-							lastUpdateCar = fmt.Sprintf("i went right")
+							lastUpdateCar = fmt.Sprintf("Went right")
 						} else {
 							nextLocation = Location{id, currentLocation.rail, currentLocation.position + 1, lap}
 							nextAcceleration = desaccelerationRacer
-							lastUpdateCar = fmt.Sprintf("deaccel")
+							lastUpdateCar = fmt.Sprintf("Deaccel")
 						}
 					} else if currentLocation.rail == 7 {
 						if track[currentLocation.rail-1][(currentLocation.position+1)%totalDistance] == " " {
 							nextLocation = Location{id, currentLocation.rail - 1, currentLocation.position + 1, lap}
 							nextAcceleration = acceleration
-							lastUpdateCar = fmt.Sprintf("i went left")
+							lastUpdateCar = fmt.Sprintf("Went left")
 						} else {
 							nextLocation = Location{id, currentLocation.rail, currentLocation.position + 1, lap}
 							nextAcceleration = desaccelerationRacer
-							lastUpdateCar = fmt.Sprintf("deaccel")
+							lastUpdateCar = fmt.Sprintf("Deaccel")
 						}
 					} else {
 						if track[currentLocation.rail+1][(currentLocation.position+1)%totalDistance] == " " {
 							nextLocation = Location{id, currentLocation.rail + 1, currentLocation.position + 1, lap}
 							nextAcceleration = acceleration
-							lastUpdateCar = fmt.Sprintf("i went right")
+							lastUpdateCar = fmt.Sprintf("Went right")
 						} else if track[currentLocation.rail-1][(currentLocation.position+1)%totalDistance] == " " {
 							nextLocation = Location{id, currentLocation.rail - 1, currentLocation.position + 1, lap}
 							nextAcceleration = acceleration
-							lastUpdateCar = fmt.Sprintf("i went left")
+							lastUpdateCar = fmt.Sprintf("Went left")
 						} else {
 							nextLocation = Location{id, currentLocation.rail, currentLocation.position + 1, lap}
 							nextAcceleration = desaccelerationRacer
-							lastUpdateCar = fmt.Sprintf("deaccel")
+							lastUpdateCar = fmt.Sprintf("Deaccel")
 						}
 					}
 				}
@@ -270,7 +270,7 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 			}
 		}
 		if nextLocation.position == 0 {
-			lastUpdateCar = "passed lap!"
+			lastUpdateCar = "Passed lap!"
 			elapsed = time.Now().Sub(startLap)
 			startLap = time.Now()
 			lap++

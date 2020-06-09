@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
 	"os"
@@ -11,7 +12,7 @@ import (
 	"time"
 )
 
-type racer chan<- Location
+//type racer chan<- Location
 
 var (
 	track         [][]string
@@ -74,6 +75,14 @@ func main() {
 	winners = []int{1, 2, 3}
 	winners = winners[:0]
 	track = make([][]string, 8)
+	competitors := make(map[int]chan bool)
+	//array used to specify starting positions of racers at start of race
+	initialPositions := [16]int{0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3}
+	nr := flag.Int("racers", 8, "number of racers!")
+	nl := flag.Int("laps", 3, "number of laps!")
+	flag.Parse()
+	numOfRacers = *nr
+	totalLaps = *nl
 
 	//initialize empty track array
 	for i := range track {
@@ -86,27 +95,8 @@ func main() {
 	}
 
 	//args := os.Args[1:]
-	numOfRacers = 4
-	totalLaps = 3
-
-	//array used to specify starting positions of racers at start of race
-	initialPositions := [16]int{0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3}
 
 	// usage: go run gran-prix.go -racers 16 -laps 20
-	if len(os.Args) == 5 || len(os.Args) == 1 {
-		if len(os.Args) == 1 {
-		} else if os.Args[1] == "-racers" && os.Args[3] == "-laps" {
-			numOfRacers, _ = strconv.Atoi(os.Args[2])
-			totalLaps, _ = strconv.Atoi(os.Args[4])
-		} else {
-			println("Wrong parameters. Usage: go run grand-prix.go -racers X -laps X")
-			os.Exit(1)
-		}
-
-	} else {
-		println("Wrong parameters. Usage: go run grand-prix.go -racers X -laps X")
-		os.Exit(2)
-	}
 
 	//create random generator for velocity and acceleration of cars
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -321,6 +311,8 @@ func prints(killT chan struct{}) {
 	start := time.Now()
 	updateList := make([]Update, numOfRacers)
 	numSpaces := 25
+	funNames := [17]string{"?", "Mario", "Luigi", "Peach", "D.K", "Bowser", "Toad", "Rosalina", "Shyguy", "Boo", "Daisy",
+		"Raio Mqueen", "Toreto", "El rey", "El oliver", "El tachas", "dicesiseis"}
 	info := [8]string{"Player ", "Rail: ", "Position: ", "Lap: ", "Speed: ", "Lap Time: ", "GlobalTime: ", "LastUpdate: "}
 	for {
 		time.Sleep(200 * time.Millisecond)
@@ -349,7 +341,7 @@ func prints(killT chan struct{}) {
 
 		if numOfRacers < 9 {
 			for j := 0; j < numOfRacers; j++ {
-				tmptmpstring := info[0] + strconv.Itoa(updateList[j].id)
+				tmptmpstring := info[0] + funNames[updateList[j].id]
 				if len(tmptmpstring) < numSpaces {
 					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
 				}
@@ -561,7 +553,7 @@ func prints(killT chan struct{}) {
 			t := time.Now().Sub(start).String()
 			println("")
 			println("Total Time: ", t)
-			println("------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
+			//println("------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
 
 		}
 		printTrack()

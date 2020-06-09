@@ -105,8 +105,8 @@ func main() {
 	for i := 1; i < numOfRacers+1; i++ {
 		tmpResponseChan := make(chan bool)
 		competitors[i] = tmpResponseChan
-		tmpMaxSpeed := float64(r.Intn(900-400) + 400)
-		tmpAcceleration := float64(r.Intn(100-40) + 40)
+		tmpMaxSpeed := float64(r.Intn(700-500) + 500)
+		tmpAcceleration := float64(r.Intn(150-75) + 75)
 		go racerDynamics(Location{i, i % 8, initialPositions[i-1], 1}, tmpMaxSpeed, tmpAcceleration, requests, tmpResponseChan)
 	}
 	killPrint := make(chan struct{})
@@ -127,21 +127,21 @@ func main() {
 					if numOfRacers < 3 {
 						if len(winners) == numOfRacers {
 							killPrint <- struct{}{}
-							println("Race is over!")
+							fmt.Println("Race is over!")
 							fmt.Println("THE WINNERS ARE:")
 							for i := 0; i < numOfRacers; i++ {
-								println(i, ") ", winners[i])
+								fmt.Println(i, ") ", winners[i])
 							}
 							return
 						}
 					} else {
 						if len(winners) == 3 {
 							killPrint <- struct{}{}
-							println("Race is over!")
+							fmt.Println("Race is over!")
 							fmt.Println("THE WINNERS ARE:")
-							println("1) ", winners[0])
-							println("2) ", winners[1])
-							println("3) ", winners[2])
+							fmt.Println("1) ", winners[0])
+							fmt.Println("2) ", winners[1])
+							fmt.Println("3) ", winners[2])
 							return
 						}
 					}
@@ -164,17 +164,17 @@ func main() {
 
 //function to print the track at any moment in race
 func printTrack() {
-	println("")
+	fmt.Println("")
 	breakzone := "| Curve  |"
-	println(strings.Repeat(" ", 23), breakzone, strings.Repeat(" ", 18), breakzone, strings.Repeat(" ", 23), breakzone, strings.Repeat(" ", 18), breakzone, strings.Repeat(" ", 18))
+	fmt.Println(strings.Repeat(" ", 23), breakzone, strings.Repeat(" ", 18), breakzone, strings.Repeat(" ", 23), breakzone, strings.Repeat(" ", 18), breakzone, strings.Repeat(" ", 18))
 	for i := range track {
 		print("|")
 		for j := range track[i] {
 			print(track[i][j])
 		}
-		print("|")
-		println("")
-		println("|", strings.Repeat("-", totalDistance), "|")
+		fmt.Print("|")
+		fmt.Println("")
+		fmt.Println("|", strings.Repeat("-", totalDistance), "|")
 	}
 }
 func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64, chanRequest chan Location, response chan bool) {
@@ -188,8 +188,9 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 	currentVelocity := 0.0
 	currentVelocity += acceleration
 	desaccelerationRacer := -400.0
-	desaccelerationCurve := -100.0
-	sleep := 1000.0
+	r2 := rand.New(rand.NewSource(time.Now().UnixNano()))
+	desaccelerationCurve := float64(-(r2.Intn(35-10) + 10))
+	sleep := 800.0
 
 	nextLocation := Location{0, 0, 0, 0}
 	nextAcceleration := 0.0
@@ -315,7 +316,6 @@ func prints(killT chan struct{}) {
 		"Raio Mqueen", "Toreto", "El rey", "El oliver", "El tachas", "dicesiseis"}
 	info := [8]string{"Player ", "Rail: ", "Position: ", "Lap: ", "Speed: ", "Lap Time: ", "GlobalTime: ", "LastUpdate: "}
 	for {
-		time.Sleep(200 * time.Millisecond)
 		space := 20
 		if len(winners) >= 1 {
 			space = 5
@@ -347,7 +347,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 0; j < numOfRacers; j++ {
 				tmptmpstring := info[1] + strconv.Itoa(updateList[j].rail)
@@ -356,7 +356,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 0; j < numOfRacers; j++ {
 				tmptmpstring := info[2] + strconv.Itoa(updateList[j].position)
@@ -365,7 +365,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 0; j < numOfRacers; j++ {
 				tmptmpstring := ""
@@ -379,7 +379,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 0; j < numOfRacers; j++ {
 				s := fmt.Sprintf("%f", updateList[j].speed)
@@ -389,7 +389,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 0; j < numOfRacers; j++ {
 				tmptmpstring := info[5] + updateList[j].lapTime
@@ -398,7 +398,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 0; j < numOfRacers; j++ {
 				tmptmpstring := info[7] + updateList[j].lastUpdate
@@ -407,9 +407,9 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
-			println("")
-			println("Total Time: ", time.Now().Sub(start).String())
+			fmt.Println(tmpString)
+			fmt.Println("")
+			fmt.Println("Total Time: ", time.Now().Sub(start).String())
 
 		} else {
 			for j := 0; j < 8; j++ {
@@ -419,7 +419,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 0; j < 8; j++ {
 				tmptmpstring := info[1] + strconv.Itoa(updateList[j].rail)
@@ -428,7 +428,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 0; j < 8; j++ {
 				tmptmpstring := info[2] + strconv.Itoa(updateList[j].position)
@@ -437,7 +437,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 0; j < 8; j++ {
 				tmptmpstring := ""
@@ -451,7 +451,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 0; j < 8; j++ {
 				s := fmt.Sprintf("%f", updateList[j].speed)
@@ -461,7 +461,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 0; j < 8; j++ {
 				tmptmpstring := info[5] + updateList[j].lapTime
@@ -470,7 +470,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 0; j < 8; j++ {
 				tmptmpstring := info[7] + updateList[j].lastUpdate
@@ -479,8 +479,8 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
-			println("")
+			fmt.Println(tmpString)
+			fmt.Println("")
 			tmpString = ""
 			for j := 8; j < numOfRacers; j++ {
 				tmptmpstring := info[0] + strconv.Itoa(updateList[j].id)
@@ -489,7 +489,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 8; j < numOfRacers; j++ {
 				tmptmpstring := info[1] + strconv.Itoa(updateList[j].rail)
@@ -498,7 +498,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 8; j < numOfRacers; j++ {
 				tmptmpstring := info[2] + strconv.Itoa(updateList[j].position)
@@ -507,7 +507,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 8; j < numOfRacers; j++ {
 				tmptmpstring := ""
@@ -521,7 +521,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 8; j < numOfRacers; j++ {
 				s := fmt.Sprintf("%f", updateList[j].speed)
@@ -531,7 +531,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 8; j < numOfRacers; j++ {
 				tmptmpstring := info[5] + updateList[j].lapTime
@@ -540,7 +540,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			tmpString = ""
 			for j := 8; j < numOfRacers; j++ {
 				tmptmpstring := info[7] + updateList[j].lastUpdate
@@ -549,7 +549,7 @@ func prints(killT chan struct{}) {
 				}
 				tmpString += tmptmpstring
 			}
-			println(tmpString)
+			fmt.Println(tmpString)
 			t := time.Now().Sub(start).String()
 			println("")
 			println("Total Time: ", t)

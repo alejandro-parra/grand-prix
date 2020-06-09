@@ -21,3 +21,6 @@ Each comptetitor has several componets that change over time in order to simulat
 * **Response channel**: It refers to the booleans channel that recieves the main goroutine's response. 
 * **Desacceleration rate for racer**: It refers to the breaking rate when a competitor aproximates to another competitor.
 * **Desacceleration rate for curve**: It refers to the breaking rate when the competitor travels through a curve on the track. 
+
+## GUI Update
+Once a competitor's request is aproved by the main goroutine, that competitor sends an update to the `prints goroutine` through the `updates channel`. The prints goroutine emptys the updates channel, fills a slice where the last update of each competitor is stored and prints each competitor stats and the competition track updated with each competitor new position.

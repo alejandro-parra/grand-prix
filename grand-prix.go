@@ -15,7 +15,9 @@ import (
 //type racer chan<- Location
 
 var (
-	track         [][]string
+	track    [][]string
+	funNames = [17]string{"?", "Mario", "Luigi", "Peach", "D.K", "Bowser", "Toad", "Rosalina", "Shyguy", "King Boo", "Daisy",
+		"Raio Mqueen", "Toreto", "El rey", "El oliver", "El tachas", "el sonic"}
 	competitors   = make(map[int]chan bool) //the reference to each communication with the racers
 	requests      = make(chan Location)     //a channel that all racers use to ask main to move
 	destroy       = make(chan Location, 60)
@@ -78,6 +80,9 @@ func main() {
 	competitors := make(map[int]chan bool)
 	//array used to specify starting positions of racers at start of race
 	initialPositions := [16]int{0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3}
+	//array used to label characters in the track
+	funChars := [17]string{"?", "M", "L", "P", "DK", "B", "T", "R", "S", "KB", "D", "~", "%", "$", "@", ">", "*"}
+
 	nr := flag.Int("racers", 8, "number of racers!")
 	nl := flag.Int("laps", 3, "number of laps!")
 	flag.Parse()
@@ -117,7 +122,7 @@ func main() {
 		//a car sends a request to move to a certain location
 		case recievedRequest := <-requests:
 			if track[recievedRequest.rail][recievedRequest.position] == " " {
-				track[recievedRequest.rail][recievedRequest.position] = strconv.Itoa(recievedRequest.id)
+				track[recievedRequest.rail][recievedRequest.position] = funChars[recievedRequest.id]
 				//track[recievedRequest.rail][recievedRequest.position] = " "
 				competitors[recievedRequest.id] <- true //change accepted
 				//update track
@@ -139,9 +144,10 @@ func main() {
 							killPrint <- struct{}{}
 							fmt.Println("Race is over!")
 							fmt.Println("THE WINNERS ARE:")
-							fmt.Println("1) ", winners[0])
-							fmt.Println("2) ", winners[1])
-							fmt.Println("3) ", winners[2])
+							fmt.Println("1) ", funNames[winners[0]])
+							fmt.Println("2) ", funNames[winners[1]])
+							fmt.Println("3) ", funNames[winners[2]])
+							fmt.Println("CONGRATULATIONS !!!!!!!!!!!")
 							return
 						}
 					}
@@ -151,10 +157,10 @@ func main() {
 			}
 		//a call to destroy an object from the track
 		case recievedRequest := <-destroy:
-			if track[recievedRequest.rail][recievedRequest.position] == strconv.Itoa(recievedRequest.id) {
+			if track[recievedRequest.rail][recievedRequest.position] == funChars[recievedRequest.id] {
 				track[recievedRequest.rail][recievedRequest.position] = " "
 			} else {
-				fmt.Println("Error, destroy request", track[recievedRequest.rail][recievedRequest.position])
+				fmt.Println("destroy", track[recievedRequest.rail][recievedRequest.position])
 			}
 		}
 
@@ -211,14 +217,14 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 				afk++
 				if track[currentLocation.rail][i] != " " { //si en esta posición hay un carro
 					firstThreat = true
-					lastUpdateCar = fmt.Sprintf("obstacle rail %d", currentLocation.rail)
+					//lastUpdateCar = fmt.Sprintf("obstacle rail %d", currentLocation.rail)
 					//fmt.Println("obstacle seen at rail", currentLocation.rail, afk, "spaces away")
 					//ver si se puede mover a los lados y rebasar el otro carro
 					if currentLocation.rail == 0 {
 						if track[currentLocation.rail+1][(currentLocation.position+1)%totalDistance] == " " {
 							nextLocation = Location{id, currentLocation.rail + 1, currentLocation.position + 1, lap}
 							nextAcceleration = acceleration
-							lastUpdateCar = fmt.Sprintf("i am at left")
+							lastUpdateCar = fmt.Sprintf("i went right")
 							//fmt.Println(id, "i am at far left")
 						} else {
 							nextLocation = Location{id, currentLocation.rail, currentLocation.position + 1, lap}
@@ -230,7 +236,7 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 						if track[currentLocation.rail-1][(currentLocation.position+1)%totalDistance] == " " {
 							nextLocation = Location{id, currentLocation.rail - 1, currentLocation.position + 1, lap}
 							nextAcceleration = acceleration
-							lastUpdateCar = fmt.Sprintf("i am at right")
+							lastUpdateCar = fmt.Sprintf("i went left")
 							//fmt.Println(id, "i am at far right")
 						} else {
 							nextLocation = Location{id, currentLocation.rail, currentLocation.position + 1, lap}
@@ -312,8 +318,6 @@ func prints(killT chan struct{}) {
 	start := time.Now()
 	updateList := make([]Update, numOfRacers)
 	numSpaces := 25
-	funNames := [17]string{"?", "Mario", "Luigi", "Peach", "D.K", "Bowser", "Toad", "Rosalina", "Shyguy", "Boo", "Daisy",
-		"Raio Mqueen", "Toreto", "El rey", "El oliver", "El tachas", "dicesiseis"}
 	info := [8]string{"Player ", "Rail: ", "Position: ", "Lap: ", "Speed: ", "Lap Time: ", "GlobalTime: ", "LastUpdate: "}
 	for {
 		space := 20
@@ -413,7 +417,7 @@ func prints(killT chan struct{}) {
 
 		} else {
 			for j := 0; j < 8; j++ {
-				tmptmpstring := info[0] + strconv.Itoa(updateList[j].id)
+				tmptmpstring := info[0] + funNames[updateList[j].id]
 				if len(tmptmpstring) < numSpaces {
 					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
 				}
@@ -483,7 +487,7 @@ func prints(killT chan struct{}) {
 			fmt.Println("")
 			tmpString = ""
 			for j := 8; j < numOfRacers; j++ {
-				tmptmpstring := info[0] + strconv.Itoa(updateList[j].id)
+				tmptmpstring := info[0] + funNames[updateList[j].id]
 				if len(tmptmpstring) < numSpaces {
 					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
 				}
@@ -551,10 +555,8 @@ func prints(killT chan struct{}) {
 			}
 			fmt.Println(tmpString)
 			t := time.Now().Sub(start).String()
-			println("")
-			println("Total Time: ", t)
-			//println("------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
-
+			fmt.Println("")
+			fmt.Println("Total Time: ", t)
 		}
 		printTrack()
 	}

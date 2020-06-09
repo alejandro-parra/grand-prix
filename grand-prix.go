@@ -15,10 +15,10 @@ type racer chan<- Location
 
 var (
 	track         [][]string
-	competitors   = make(map[int]chan bool)
-	requests      = make(chan Location)
+	competitors   = make(map[int]chan bool) //the reference to each communication with the racers
+	requests      = make(chan Location)     //a channel that all racers use to ask main to move
 	destroy       = make(chan Location, 60)
-	updateChan    = make(chan Update, 60) //no pasa naaa
+	updateChan    = make(chan Update, 60) //channel to provide the printing system each racer's stats
 	totalLaps     int
 	numOfRacers   int
 	totalDistance int
@@ -46,6 +46,7 @@ type Location struct {
 	currentLap int
 }
 
+//code from: https://stackoverflow.com/questions/22891644/how-can-i-clear-the-terminal-screen-in-go
 func init() {
 	clear = make(map[string]func()) //Initialize it
 	clear["linux"] = func() {
@@ -59,7 +60,6 @@ func init() {
 		cmd.Run()
 	}
 }
-
 func callClear() {
 	value, ok := clear[runtime.GOOS] //runtime.GOOS -> linux, windows, darwin etc.
 	if ok {                          //if we defined a clear func for that platform:
@@ -70,32 +70,48 @@ func callClear() {
 }
 
 func main() {
-	totalDistance = 100
+	totalDistance = 150
 	winners = []int{1, 2, 3}
 	winners = winners[:0]
 	track = make([][]string, 8)
 
+	//initialize empty track array
 	for i := range track {
 		track[i] = make([]string, totalDistance)
 	}
-
 	for i := range track {
 		for j := range track[i] {
 			track[i][j] = " "
 		}
 	}
 
-	args := os.Args[1:]
+	//args := os.Args[1:]
 	numOfRacers = 4
 	totalLaps = 3
+
+	//array used to specify starting positions of racers at start of race
 	initialPositions := [16]int{0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3}
 
-	// go run gran-prix.go -racers 16 -laps 20
-	if len(args) == 4 {
-		numOfRacers, _ = strconv.Atoi(os.Args[2])
-		totalLaps, _ = strconv.Atoi(os.Args[4])
+	// usage: go run gran-prix.go -racers 16 -laps 20
+	if len(os.Args) == 5 || len(os.Args) == 1 {
+		if len(os.Args) == 1 {
+		} else if os.Args[1] == "-racers" && os.Args[3] == "-laps" {
+			numOfRacers, _ = strconv.Atoi(os.Args[2])
+			totalLaps, _ = strconv.Atoi(os.Args[4])
+		} else {
+			println("Wrong parameters. Usage: go run grand-prix.go -racers X -laps X")
+			os.Exit(1)
+		}
+
+	} else {
+		println("Wrong parameters. Usage: go run grand-prix.go -racers X -laps X")
+		os.Exit(2)
 	}
+
+	//create random generator for velocity and acceleration of cars
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	//initialize racers
 	for i := 1; i < numOfRacers+1; i++ {
 		tmpResponseChan := make(chan bool)
 		competitors[i] = tmpResponseChan
@@ -107,6 +123,8 @@ func main() {
 	go prints(killPrint)
 	for {
 		select {
+
+		//a car sends a request to move to a certain location
 		case recievedRequest := <-requests:
 			if track[recievedRequest.rail][recievedRequest.position] == " " {
 				track[recievedRequest.rail][recievedRequest.position] = strconv.Itoa(recievedRequest.id)
@@ -114,23 +132,39 @@ func main() {
 				competitors[recievedRequest.id] <- true //change accepted
 				//update track
 				if recievedRequest.currentLap == totalLaps && recievedRequest.position == 0 { //declare winners
-					fmt.Println("WINNER WINNER CHICKEN DINNER", recievedRequest.id)
+					//fmt.Println("WINNER WINNER CHICKEN DINNER", recievedRequest.id)
 					winners = append(winners, recievedRequest.id)
-					if len(winners) == 3 {
-						killPrint <- struct{}{}
-						println("race is over")
-						fmt.Println("THE WINNERS ARE:", winners)
-						return
+					if numOfRacers < 3 {
+						if len(winners) == numOfRacers {
+							killPrint <- struct{}{}
+							println("Race is over!")
+							fmt.Println("THE WINNERS ARE:")
+							for i := 0; i < numOfRacers; i++ {
+								println(i, ") ", winners[i])
+							}
+							return
+						}
+					} else {
+						if len(winners) == 3 {
+							killPrint <- struct{}{}
+							println("Race is over!")
+							fmt.Println("THE WINNERS ARE:")
+							println("1) ", winners[0])
+							println("2) ", winners[1])
+							println("3) ", winners[2])
+							return
+						}
 					}
 				}
 			} else {
 				competitors[recievedRequest.id] <- false
 			}
+		//a call to destroy an object from the track
 		case recievedRequest := <-destroy:
 			if track[recievedRequest.rail][recievedRequest.position] == strconv.Itoa(recievedRequest.id) {
 				track[recievedRequest.rail][recievedRequest.position] = " "
 			} else {
-				fmt.Println("UYYYYYYYYYYYYY", track[recievedRequest.rail][recievedRequest.position])
+				fmt.Println("Error, destroy request", track[recievedRequest.rail][recievedRequest.position])
 			}
 		}
 
@@ -138,17 +172,23 @@ func main() {
 
 }
 
+//function to print the track at any moment in race
 func printTrack() {
+	println("")
+	breakzone := "| Curve  |"
+	println(strings.Repeat(" ", 23), breakzone, strings.Repeat(" ", 18), breakzone, strings.Repeat(" ", 23), breakzone, strings.Repeat(" ", 18), breakzone, strings.Repeat(" ", 18))
 	for i := range track {
+		print("|")
 		for j := range track[i] {
 			print(track[i][j])
 		}
+		print("|")
 		println("")
-		println("-------------------------------------------------------------------------------------------------------------------------------------------------------------")
+		println("|", strings.Repeat("-", totalDistance), "|")
 	}
 }
 func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64, chanRequest chan Location, response chan bool) {
-	// zonas de frenado {40, 80, 120, 160}
+	// zonas de frenado {25-35, 55-65, 90-100, 120-130}
 
 	start := time.Now() //tiempo al inicio de la carrera
 	startLap := time.Now()
@@ -226,6 +266,7 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 						}
 					}
 				}
+				//si ya encontro algo adelante, no sigas buscando
 				if firstThreat || indexOutOfRange {
 					break
 				}
@@ -235,7 +276,7 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 				nextAcceleration = acceleration
 			}
 			//si el carro se encuentra en una zona de frenado (curvas)
-			if (currentLocation.position >= 40 && currentLocation.position <= 50) || (currentLocation.position >= 80 && currentLocation.position <= 90) || (currentLocation.position >= 120 && currentLocation.position <= 130) || (currentLocation.position >= 160 && currentLocation.position <= 170) {
+			if (currentLocation.position >= 25 && currentLocation.position <= 35) || (currentLocation.position >= 55 && currentLocation.position <= 65) || (currentLocation.position >= 90 && currentLocation.position <= 100) || (currentLocation.position >= 120 && currentLocation.position <= 130) {
 				nextAcceleration = desaccelerationCurve
 			}
 			if nextLocation.position >= totalDistance {
@@ -265,7 +306,7 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 			}
 		} else {
 			if currentVelocity >= 0 {
-				if currentVelocity-nextAcceleration < 0 {
+				if currentVelocity+nextAcceleration < 0 {
 					currentVelocity = 0
 				} else {
 					currentVelocity += nextAcceleration
@@ -276,23 +317,13 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 		updateChan <- Update{id, currentLocation.rail, currentLocation.position, lap, currentVelocity, elapsed.String(), time.Now().Sub(start).String(), lastUpdateCar}
 	}
 }
-
-/*type Update struct {
-	id       int
-	rail     int
-	position int
-	lap      int
-	speed	 float64
-	lapTime  string
-	racingTime	string
-}*/
 func prints(killT chan struct{}) {
 	start := time.Now()
 	updateList := make([]Update, numOfRacers)
 	numSpaces := 25
 	info := [8]string{"Player ", "Rail: ", "Position: ", "Lap: ", "Speed: ", "Lap Time: ", "GlobalTime: ", "LastUpdate: "}
 	for {
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		space := 20
 		if len(winners) >= 1 {
 			space = 5
@@ -533,7 +564,7 @@ func prints(killT chan struct{}) {
 			println("------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
 
 		}
-
+		printTrack()
 	}
 
 }

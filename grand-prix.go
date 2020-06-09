@@ -16,8 +16,9 @@ import (
 
 var (
 	track    [][]string
-	funNames = [17]string{"?", "Mario", "Luigi", "Peach", "D.K", "Bowser", "Toad", "Rosalina", "Shyguy", "King Boo", "Daisy",
+	funNames = [17]string{"?", "Mario", "Luigi", "Peach", "D.K", "Bowser", "Toad", "Rosalina", "Guido", "King Boo", "Daisy",
 		"Raio Mqueen", "Toreto", "El rey", "El oliver", "El tachas", "el sonic"}
+	funChars      = [17]string{"?", "M", "L", "P", "DK", "B", "T", "R", "G", "KB", "D", "~", "%", "$", "@", ">", "*"}
 	competitors   = make(map[int]chan bool) //the reference to each communication with the racers
 	requests      = make(chan Location)     //a channel that all racers use to ask main to move
 	destroy       = make(chan Location, 60)
@@ -37,7 +38,6 @@ type Update struct {
 	lap        int
 	speed      float64
 	lapTime    string
-	racingTime string
 	lastUpdate string
 }
 
@@ -80,15 +80,16 @@ func main() {
 	competitors := make(map[int]chan bool)
 	//array used to specify starting positions of racers at start of race
 	initialPositions := [16]int{0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 3, 3}
-	//array used to label characters in the track
-	funChars := [17]string{"?", "M", "L", "P", "DK", "B", "T", "R", "S", "KB", "D", "~", "%", "$", "@", ">", "*"}
 
 	nr := flag.Int("racers", 8, "number of racers!")
 	nl := flag.Int("laps", 3, "number of laps!")
 	flag.Parse()
 	numOfRacers = *nr
 	totalLaps = *nl
-
+	if numOfRacers > 16 || numOfRacers < 1 || totalLaps < 1 {
+		fmt.Println("wrong number of racers or laps, must be between 1 and 16")
+		return
+	}
 	//initialize empty track array
 	for i := range track {
 		track[i] = make([]string, totalDistance)
@@ -98,11 +99,6 @@ func main() {
 			track[i][j] = " "
 		}
 	}
-
-	//args := os.Args[1:]
-
-	// usage: go run gran-prix.go -racers 16 -laps 20
-
 	//create random generator for velocity and acceleration of cars
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -135,7 +131,7 @@ func main() {
 							fmt.Println("Race is over!")
 							fmt.Println("THE WINNERS ARE:")
 							for i := 0; i < numOfRacers; i++ {
-								fmt.Println(i, ") ", winners[i])
+								fmt.Println(i+1, ") ", funNames[winners[i]])
 							}
 							return
 						}
@@ -144,9 +140,9 @@ func main() {
 							killPrint <- struct{}{}
 							fmt.Println("Race is over!")
 							fmt.Println("THE WINNERS ARE:")
-							fmt.Println("1) ", funNames[winners[0]])
-							fmt.Println("2) ", funNames[winners[1]])
-							fmt.Println("3) ", funNames[winners[2]])
+							fmt.Println("1ST: ", funNames[winners[0]])
+							fmt.Println("2ND: ", funNames[winners[1]])
+							fmt.Println("3RD: ", funNames[winners[2]])
 							fmt.Println("CONGRATULATIONS !!!!!!!!!!!")
 							return
 						}
@@ -160,7 +156,7 @@ func main() {
 			if track[recievedRequest.rail][recievedRequest.position] == funChars[recievedRequest.id] {
 				track[recievedRequest.rail][recievedRequest.position] = " "
 			} else {
-				fmt.Println("destroy", track[recievedRequest.rail][recievedRequest.position])
+				fmt.Println(funNames[recievedRequest.id], ": LET'S GO!")
 			}
 		}
 
@@ -183,19 +179,18 @@ func printTrack() {
 		fmt.Println("|", strings.Repeat("-", totalDistance), "|")
 	}
 }
+
 func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64, chanRequest chan Location, response chan bool) {
 	// zonas de frenado {25-35, 55-65, 90-100, 120-130}
 
-	start := time.Now() //tiempo al inicio de la carrera
 	startLap := time.Now()
-	elapsed := startLap.Sub(start)
+	elapsed := time.Now().Sub(startLap)
 	id := initLocation.id
 	currentLocation := initLocation
-	currentVelocity := 0.0
-	currentVelocity += acceleration
+	currentVelocity := acceleration
 	desaccelerationRacer := -400.0
 	r2 := rand.New(rand.NewSource(time.Now().UnixNano()))
-	desaccelerationCurve := float64(-(r2.Intn(35-10) + 10))
+	desaccelerationCurve := float64(-(r2.Intn(50-10) + 10))
 	sleep := 800.0
 
 	nextLocation := Location{0, 0, 0, 0}
@@ -203,68 +198,56 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 	lastUpdateCar := ""
 	lap := initLocation.currentLap
 	for lap < totalLaps+1 { //mientras el coche no haya terminado la carrera
-		if currentVelocity < maxSpeed { //si el carro no ha llegado a su limite de velocidad
-			time.Sleep(time.Duration(sleep-currentVelocity) * time.Millisecond)
-		} else { //si el carro ya llego a su limite de velocidad
-			time.Sleep(time.Duration(sleep-maxSpeed) * time.Millisecond)
-		}
+		//if currentVelocity < maxSpeed { //si el carro no ha llegado a su limite de velocidad
+		time.Sleep(time.Duration(sleep-currentVelocity) * time.Millisecond)
+		//} else { //si el carro ya llego a su limite de velocidad
+		//	time.Sleep(time.Duration(sleep-maxSpeed) * time.Millisecond) //minimo 100
+		//}
 		for {
 			firstThreat := false
-			indexOutOfRange := false
 			//se checan las siguientes 5 posiciones en busqueda de carros que estorben
-			afk := 0
 			for i := (currentLocation.position + 1) % totalDistance; i != (currentLocation.position+5)%totalDistance; i = (i + 1) % totalDistance {
-				afk++
 				if track[currentLocation.rail][i] != " " { //si en esta posición hay un carro
 					firstThreat = true
-					//lastUpdateCar = fmt.Sprintf("obstacle rail %d", currentLocation.rail)
-					//fmt.Println("obstacle seen at rail", currentLocation.rail, afk, "spaces away")
 					//ver si se puede mover a los lados y rebasar el otro carro
 					if currentLocation.rail == 0 {
 						if track[currentLocation.rail+1][(currentLocation.position+1)%totalDistance] == " " {
 							nextLocation = Location{id, currentLocation.rail + 1, currentLocation.position + 1, lap}
 							nextAcceleration = acceleration
 							lastUpdateCar = fmt.Sprintf("i went right")
-							//fmt.Println(id, "i am at far left")
 						} else {
 							nextLocation = Location{id, currentLocation.rail, currentLocation.position + 1, lap}
 							nextAcceleration = desaccelerationRacer
-							lastUpdateCar = fmt.Sprintf("deaccelerating3")
-							//fmt.Println("deaccelerating3")
+							lastUpdateCar = fmt.Sprintf("deaccel")
 						}
 					} else if currentLocation.rail == 7 {
 						if track[currentLocation.rail-1][(currentLocation.position+1)%totalDistance] == " " {
 							nextLocation = Location{id, currentLocation.rail - 1, currentLocation.position + 1, lap}
 							nextAcceleration = acceleration
 							lastUpdateCar = fmt.Sprintf("i went left")
-							//fmt.Println(id, "i am at far right")
 						} else {
 							nextLocation = Location{id, currentLocation.rail, currentLocation.position + 1, lap}
 							nextAcceleration = desaccelerationRacer
-							lastUpdateCar = fmt.Sprintf("deaccelerating2")
-							//fmt.Println("deaccelerating2")
+							lastUpdateCar = fmt.Sprintf("deaccel")
 						}
 					} else {
 						if track[currentLocation.rail+1][(currentLocation.position+1)%totalDistance] == " " {
 							nextLocation = Location{id, currentLocation.rail + 1, currentLocation.position + 1, lap}
 							nextAcceleration = acceleration
 							lastUpdateCar = fmt.Sprintf("i went right")
-							//fmt.Println(id, "i went to the right")
 						} else if track[currentLocation.rail-1][(currentLocation.position+1)%totalDistance] == " " {
 							nextLocation = Location{id, currentLocation.rail - 1, currentLocation.position + 1, lap}
 							nextAcceleration = acceleration
 							lastUpdateCar = fmt.Sprintf("i went left")
-							//fmt.Println(id, "i went to the left")
 						} else {
 							nextLocation = Location{id, currentLocation.rail, currentLocation.position + 1, lap}
 							nextAcceleration = desaccelerationRacer
-							lastUpdateCar = fmt.Sprintf("deaccelerating")
-							//fmt.Println("deaccelerating")
+							lastUpdateCar = fmt.Sprintf("deaccel")
 						}
 					}
 				}
 				//si ya encontro algo adelante, no sigas buscando
-				if firstThreat || indexOutOfRange {
+				if firstThreat {
 					break
 				}
 			}
@@ -278,7 +261,6 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 			}
 			if nextLocation.position >= totalDistance {
 				nextLocation.position = 0
-				//fmt.Println(id, "my pos was total distance", nextLocation)
 			}
 			chanRequest <- nextLocation
 
@@ -288,32 +270,37 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 			}
 		}
 		if nextLocation.position == 0 {
-			lastUpdateCar = "completed lap"
-			//fmt.Println(id, "a lap is done!", nextLocation)
-			t := time.Now()
-			elapsed = t.Sub(startLap)
+			lastUpdateCar = "passed lap!"
+			elapsed = time.Now().Sub(startLap)
 			startLap = time.Now()
 			lap++
-
 		}
 		currentLocation = nextLocation
 		if nextAcceleration > 0 {
 			if currentVelocity < maxSpeed {
 				currentVelocity += nextAcceleration
+			} else {
+				currentVelocity = maxSpeed
 			}
 		} else {
-			if currentVelocity >= 0 {
-				if currentVelocity+nextAcceleration < 0 {
-					currentVelocity = 0
-				} else {
-					currentVelocity += nextAcceleration
-				}
-
+			if currentVelocity+nextAcceleration < 0 {
+				currentVelocity = 0
+			} else {
+				currentVelocity += nextAcceleration
 			}
 		}
-		updateChan <- Update{id, currentLocation.rail, currentLocation.position, lap, currentVelocity, elapsed.String(), time.Now().Sub(start).String(), lastUpdateCar}
+		updateChan <- Update{id, currentLocation.rail, currentLocation.position, lap, currentVelocity, elapsed.String(), lastUpdateCar}
 	}
 }
+
+// formats the print to be the same size as the others
+func formatPrint(thePrint string, numSpaces int) string {
+	if len(thePrint) < numSpaces {
+		thePrint += strings.Repeat(" ", (numSpaces - len(thePrint)))
+	}
+	return thePrint
+}
+
 func prints(killT chan struct{}) {
 	start := time.Now()
 	updateList := make([]Update, numOfRacers)
@@ -326,238 +313,46 @@ func prints(killT chan struct{}) {
 		} else if numOfRacers < 5 {
 			space = 10
 		}
-		tmpUpdateList := make([]Update, space)
-		for i := 0; i < len(tmpUpdateList); i++ {
+
+		for i := 0; i < space; i++ {
 			select {
 			case x := <-updateChan:
-				tmpUpdateList[i] = x
+				updateList[x.id-1] = x
 			case <-killT:
 				return
 			}
 		}
-
-		for i := 0; i < len(tmpUpdateList); i++ {
-			tmpid := tmpUpdateList[i].id
-			updateList[tmpid-1] = tmpUpdateList[i]
-		}
-		tmpString := ""
 		callClear()
 
-		if numOfRacers < 9 {
-			for j := 0; j < numOfRacers; j++ {
-				tmptmpstring := info[0] + funNames[updateList[j].id]
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
+		params := make([]string, 7)
+		for j := 0; j < numOfRacers; j++ {
+			if j == 8 {
+				for i, v := range params {
+					fmt.Println(v)
+					params[i] = ""
 				}
-				tmpString += tmptmpstring
+				fmt.Println("")
 			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 0; j < numOfRacers; j++ {
-				tmptmpstring := info[1] + strconv.Itoa(updateList[j].rail)
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
+			tmpString := info[0] + funNames[updateList[j].id] + " - " + funChars[updateList[j].id]
+			params[0] += formatPrint(tmpString, numSpaces)                                    //id
+			params[1] += formatPrint(info[1]+strconv.Itoa(updateList[j].rail), numSpaces)     //rail
+			params[2] += formatPrint(info[2]+strconv.Itoa(updateList[j].position), numSpaces) //position
+			if updateList[j].lap == totalLaps+1 {
+				tmpString = info[3] + "Finished!"
+			} else {
+				tmpString = info[3] + strconv.Itoa(updateList[j].lap)
 			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 0; j < numOfRacers; j++ {
-				tmptmpstring := info[2] + strconv.Itoa(updateList[j].position)
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 0; j < numOfRacers; j++ {
-				tmptmpstring := ""
-				if updateList[j].lap == totalLaps+1 {
-					tmptmpstring = info[3] + "Finished!"
-				} else {
-					tmptmpstring = info[3] + strconv.Itoa(updateList[j].lap)
-				}
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 0; j < numOfRacers; j++ {
-				s := fmt.Sprintf("%f", updateList[j].speed)
-				tmptmpstring := info[4] + s
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 0; j < numOfRacers; j++ {
-				tmptmpstring := info[5] + updateList[j].lapTime
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 0; j < numOfRacers; j++ {
-				tmptmpstring := info[7] + updateList[j].lastUpdate
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			fmt.Println("")
-			fmt.Println("Total Time: ", time.Now().Sub(start).String())
-
-		} else {
-			for j := 0; j < 8; j++ {
-				tmptmpstring := info[0] + funNames[updateList[j].id]
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 0; j < 8; j++ {
-				tmptmpstring := info[1] + strconv.Itoa(updateList[j].rail)
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 0; j < 8; j++ {
-				tmptmpstring := info[2] + strconv.Itoa(updateList[j].position)
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 0; j < 8; j++ {
-				tmptmpstring := ""
-				if updateList[j].lap == totalLaps+1 {
-					tmptmpstring = info[3] + "Finished!"
-				} else {
-					tmptmpstring = info[3] + strconv.Itoa(updateList[j].lap)
-				}
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 0; j < 8; j++ {
-				s := fmt.Sprintf("%f", updateList[j].speed)
-				tmptmpstring := info[4] + s
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 0; j < 8; j++ {
-				tmptmpstring := info[5] + updateList[j].lapTime
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 0; j < 8; j++ {
-				tmptmpstring := info[7] + updateList[j].lastUpdate
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			fmt.Println("")
-			tmpString = ""
-			for j := 8; j < numOfRacers; j++ {
-				tmptmpstring := info[0] + funNames[updateList[j].id]
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 8; j < numOfRacers; j++ {
-				tmptmpstring := info[1] + strconv.Itoa(updateList[j].rail)
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 8; j < numOfRacers; j++ {
-				tmptmpstring := info[2] + strconv.Itoa(updateList[j].position)
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 8; j < numOfRacers; j++ {
-				tmptmpstring := ""
-				if updateList[j].lap == totalLaps+1 {
-					tmptmpstring = info[3] + "Finished!"
-				} else {
-					tmptmpstring = info[3] + strconv.Itoa(updateList[j].lap)
-				}
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 8; j < numOfRacers; j++ {
-				s := fmt.Sprintf("%f", updateList[j].speed)
-				tmptmpstring := info[4] + s
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 8; j < numOfRacers; j++ {
-				tmptmpstring := info[5] + updateList[j].lapTime
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			tmpString = ""
-			for j := 8; j < numOfRacers; j++ {
-				tmptmpstring := info[7] + updateList[j].lastUpdate
-				if len(tmptmpstring) < numSpaces {
-					tmptmpstring += strings.Repeat(" ", (numSpaces - len(tmptmpstring)))
-				}
-				tmpString += tmptmpstring
-			}
-			fmt.Println(tmpString)
-			t := time.Now().Sub(start).String()
-			fmt.Println("")
-			fmt.Println("Total Time: ", t)
+			params[3] += formatPrint(tmpString, numSpaces) //location
+			s := fmt.Sprintf("%f", updateList[j].speed)
+			params[4] += formatPrint(info[4]+s, numSpaces)                        //speed
+			params[5] += formatPrint(info[5]+updateList[j].lapTime, numSpaces)    //lap time
+			params[6] += formatPrint(info[7]+updateList[j].lastUpdate, numSpaces) //last update
 		}
+		for _, v := range params {
+			fmt.Println(v)
+		}
+		fmt.Println("")
+		fmt.Println("Total Time: ", time.Now().Sub(start).String())
 		printTrack()
 	}
 

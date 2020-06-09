@@ -18,17 +18,18 @@ var (
 	track    [][]string
 	funNames = [17]string{"?", "Mario", "Luigi", "Peach", "D.K", "Bowser", "Toad", "Rosalina", "Guido", "King Boo", "Daisy",
 		"Raio Mqueen", "Toreto", "El rey", "El oliver", "El tachas", "el sonic"}
-	funChars      = [17]string{"?", "M", "L", "P", "DK", "B", "T", "R", "G", "KB", "D", "~", "%", "$", "@", ">", "*"}
-	competitors   = make(map[int]chan bool) //the reference to each communication with the racers
-	requests      = make(chan Location)     //a channel that all racers use to ask main to move
-	destroy       = make(chan Location, 60)
-	updateChan    = make(chan Update, 60) //channel to provide the printing system each racer's stats
-	totalLaps     int
-	numOfRacers   int
-	totalDistance int
-	winners       []int
-	clear         map[string]func() //create a map for storing clear funcs
+	funChars    = [17]string{"?", "M", "L", "P", "DK", "B", "T", "R", "G", "KB", "D", "~", "%", "$", "@", ">", "*"}
+	competitors = make(map[int]chan bool) //the reference to each communication with the racers
+	requests    = make(chan Location)     //a channel that all racers use to ask main to move
+	destroy     = make(chan Location, 60) //channel that racers use to ask main to clean
+	updateChan  = make(chan Update, 60)   //channel to provide the printing system each racer's stats
+	totalLaps   int
+	numOfRacers int
+	winners     []int
+	clear       map[string]func() //create a map for storing clear funcs
 )
+
+const totalDistance = 150
 
 //Update : struct that contains essential elements for the broadcasters
 type Update struct {
@@ -73,7 +74,6 @@ func callClear() {
 }
 
 func main() {
-	totalDistance = 150
 	winners = []int{1, 2, 3}
 	winners = winners[:0]
 	track = make([][]string, 8)
@@ -86,6 +86,7 @@ func main() {
 	flag.Parse()
 	numOfRacers = *nr
 	totalLaps = *nl
+	//validate inputs
 	if numOfRacers > 16 || numOfRacers < 1 || totalLaps < 1 {
 		fmt.Println("wrong number of racers or laps, must be between 1 and 16")
 		return
@@ -168,15 +169,19 @@ func main() {
 func printTrack() {
 	fmt.Println("")
 	breakzone := "| Curve  |"
-	fmt.Println(strings.Repeat(" ", 23), breakzone, strings.Repeat(" ", 18), breakzone, strings.Repeat(" ", 23), breakzone, strings.Repeat(" ", 18), breakzone, strings.Repeat(" ", 18))
+	tmp := strings.Repeat(" ", 25) + breakzone + strings.Repeat(" ", 19) + breakzone + strings.Repeat(" ", 24) + breakzone + strings.Repeat(" ", 19) + breakzone + strings.Repeat(" ", 19)
+	fmt.Println(tmp)
 	for i := range track {
-		print("|")
+		fmt.Print("|")
+		tmp = ""
 		for j := range track[i] {
-			print(track[i][j])
+			tmp += track[i][j]
 		}
+		fmt.Print(tmp)
 		fmt.Print("|")
 		fmt.Println("")
-		fmt.Println("|", strings.Repeat("-", totalDistance), "|")
+		tmp = "| " + strings.Repeat("-", totalDistance) + " |"
+		fmt.Println(tmp)
 	}
 }
 
@@ -198,11 +203,7 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 	lastUpdateCar := ""
 	lap := initLocation.currentLap
 	for lap < totalLaps+1 { //mientras el coche no haya terminado la carrera
-		//if currentVelocity < maxSpeed { //si el carro no ha llegado a su limite de velocidad
 		time.Sleep(time.Duration(sleep-currentVelocity) * time.Millisecond)
-		//} else { //si el carro ya llego a su limite de velocidad
-		//	time.Sleep(time.Duration(sleep-maxSpeed) * time.Millisecond) //minimo 100
-		//}
 		for {
 			firstThreat := false
 			//se checan las siguientes 5 posiciones en busqueda de carros que estorben
@@ -304,7 +305,7 @@ func formatPrint(thePrint string, numSpaces int) string {
 func prints(killT chan struct{}) {
 	start := time.Now()
 	updateList := make([]Update, numOfRacers)
-	numSpaces := 25
+	const numSpaces = 25
 	info := [8]string{"Player ", "Rail: ", "Position: ", "Lap: ", "Speed: ", "Lap Time: ", "GlobalTime: ", "LastUpdate: "}
 	for {
 		space := 20

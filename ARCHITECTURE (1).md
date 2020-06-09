@@ -6,7 +6,7 @@ Multithreaded Grand Prix Simulator
 Each competitor in the race is simulated as a separated `thread`. The competitors threads communicate with the main thread, which coordinates them all and controls the flow of the race. Memory's shared by communicating the competitors with the main goroutine, since all the competitors use and evaluate the same competition track. All the competitors send their movement requests through the same `channel`, and the main goroutine evaluate the request and send an answer thorugh each competitor's `response channel`. 
 
 
-**Competitors composition**
+##Competitors composition
 Each comptetitor has several componets that change over time in order to simulate the competitor's movement.
 
 * **Location struct**: A competitor send through the requests channel a new Location request, which refers to where the competitor wants to go. The Location struct contains the following elements

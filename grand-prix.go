@@ -16,9 +16,9 @@ type racer chan<- Location
 var (
 	track         [][]string
 	competitors   = make(map[int]chan bool) //the reference to each communication with the racers
-	requests      = make(chan Location)     //a channel that all racers use to ask main to move
+	requests      = make(chan Location)		//a channel that all racers use to ask main to move
 	destroy       = make(chan Location, 60)
-	updateChan    = make(chan Update, 60) //channel to provide the printing system each racer's stats
+	updateChan    = make(chan Update, 60)	//channel to provide the printing system each racer's stats
 	totalLaps     int
 	numOfRacers   int
 	totalDistance int
@@ -115,8 +115,8 @@ func main() {
 	for i := 1; i < numOfRacers+1; i++ {
 		tmpResponseChan := make(chan bool)
 		competitors[i] = tmpResponseChan
-		tmpMaxSpeed := float64(r.Intn(900-400) + 400)
-		tmpAcceleration := float64(r.Intn(100-40) + 40)
+		tmpMaxSpeed := float64(r.Intn(700-500) + 500)
+		tmpAcceleration := float64(r.Intn(150-75) + 75)
 		go racerDynamics(Location{i, i % 8, initialPositions[i-1], 1}, tmpMaxSpeed, tmpAcceleration, requests, tmpResponseChan)
 	}
 	killPrint := make(chan struct{})
@@ -198,8 +198,8 @@ func racerDynamics(initLocation Location, maxSpeed float64, acceleration float64
 	currentVelocity := 0.0
 	currentVelocity += acceleration
 	desaccelerationRacer := -400.0
-	desaccelerationCurve := -100.0
-	sleep := 1000.0
+	desaccelerationCurve := -50.0
+	sleep := 800.0
 
 	nextLocation := Location{0, 0, 0, 0}
 	nextAcceleration := 0.0
@@ -323,7 +323,6 @@ func prints(killT chan struct{}) {
 	numSpaces := 25
 	info := [8]string{"Player ", "Rail: ", "Position: ", "Lap: ", "Speed: ", "Lap Time: ", "GlobalTime: ", "LastUpdate: "}
 	for {
-		time.Sleep(200 * time.Millisecond)
 		space := 20
 		if len(winners) >= 1 {
 			space = 5
